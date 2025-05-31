@@ -1,7 +1,7 @@
 package tp2
 type Aeropuerto interface{
 	/*Agregar_archivo recbie el nombre d eun archivo .csv y lo procesa*/ 
-	Agregar_Archivo(nombreArchivo string)
+	Agregar_Archivo(nombreArchivo string) error
 	
 	Ver_Tablero(K int, modo, desde, hasta string )
 

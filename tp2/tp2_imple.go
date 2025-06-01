@@ -7,38 +7,78 @@ import(
 	"os"
 	"strconv"
 	"fmt"
+
+
 	Hash	"tdas/diccionario"
 	Abb		"tdas/diccionario"
 	Heap	"tdas/heap"
 	vuelo	"tdas/tp2/vuelo"
 )
 
+// FechaClave se usa para ordenar en el ABB
+// Se ordena por fecha, y si coinciden, por el codigo
+type FechaClave struct{
+	Fecha time.Time
+	Codigo	string
+}
+
+// comparadorFechaClave compara primero por fecha y ordena por esta misma, si no por Codigo
+func comparadorFechaClave(a, b FechaClave) int{
+	if a.Fecha.Before(b.Fecha){
+		return -1
+	}
+	if a.Fecha.After(b.Fecha){
+		return 1
+	}
+
+	if a.Codigo < b.Codigo{
+		return -1
+	}else if a.Codigo > b.Codigo{
+		return -1
+	}
+	return 0
+}
+
+// compradorPrioridad compara primero por prioridad, en caso de empate compara por codigo.
+func comparadorPrioridad(v1, v2 vuelo.Vuelo) int{
+	diff := v1.ObtenerPrioridad() - v2.ObtenerPrioridad()
+	if diff != 0{
+		return diff
+	}
+
+	if v1.ObtenerCodigo() < v2.ObtenerCodigo(){
+		return 1
+	} else if v1.ObtenerCodigo() > v2.ObtenerCodigo(){
+		return -1
+	}
+	return 0
+}
+
+
+// SistemaVuelos expone un TDA para:
+// - guardar vuelos a partir de archivos CSV,
+// - buscarlos por código,
+// - listarlos ordenados por fecha,
+// - y desencolar por prioridad (filtrando duplicados)
+
 type SistemaVuelos struct{
 	porCodigo	Hash.Diccionario[string,vuelo.Vuelo]		
-	porFecha	Abb.DiccionarioOrdenado[time.Time, vuelo.Vuelo]
+	porFecha	Abb.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]
 	porPrioridad	Heap.ColaPrioridad[vuelo.Vuelo]
 }
 
+// CrearSistemaDeVuelos instancia el TDA vacío.
 func CrearSistemaDeVuelos() Aeropuerto{
-	comparador := func(v1, v2 vuelo.Vuelo) int{
-		return v1.ObtenerPrioridad() - v2.ObtenerPrioridad()
-	}
 
 	return &SistemaVuelos{
 		porCodigo: Hash.CrearHash[string,vuelo.Vuelo](),
-		porFecha: Abb.CrearABB[time.Time, vuelo.Vuelo](func(f1, f2 time.Time) int{
-			if f1.Before(f2){
-				return -1
-			} else if f1.After(f2){
-				return 1
-			}
-			return 0
-		}),
-		porPrioridad: Heap.CrearHeap[vuelo.Vuelo](comparador),
+		porFecha: Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave),
+		porPrioridad: Heap.CrearHeap[vuelo.Vuelo](comparadorPrioridad),
 	}
 }
 
-
+// Agregar_Archivo lee el CSV completo y va insertando cada línea en el TDA.
+// Si un vuelo ya existía (mismo código), se reemplaza la entrada anterior.
 func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error{
 	archivo, err := os.Open(nombreArchivo)
 

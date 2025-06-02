@@ -15,52 +15,12 @@ import(
 	vuelo	"tdas/tp2/vuelo"
 )
 
-// FechaClave se usa para ordenar en el ABB
-// Se ordena por fecha, y si coinciden, por el codigo
-type FechaClave struct{
-	Fecha time.Time
-	Codigo	string
-}
-
-// comparadorFechaClave compara primero por fecha y ordena por esta misma, si no por Codigo
-func comparadorFechaClave(a, b FechaClave) int{
-	if a.Fecha.Before(b.Fecha){
-		return -1
-	}
-	if a.Fecha.After(b.Fecha){
-		return 1
-	}
-
-	if a.Codigo < b.Codigo{
-		return -1
-	}else if a.Codigo > b.Codigo{
-		return -1
-	}
-	return 0
-}
-
-// compradorPrioridad compara primero por prioridad, en caso de empate compara por codigo.
-func comparadorPrioridad(v1, v2 vuelo.Vuelo) int{
-	diff := v1.ObtenerPrioridad() - v2.ObtenerPrioridad()
-	if diff != 0{
-		return diff
-	}
-
-	if v1.ObtenerCodigo() < v2.ObtenerCodigo(){
-		return 1
-	} else if v1.ObtenerCodigo() > v2.ObtenerCodigo(){
-		return -1
-	}
-	return 0
-}
-
 
 // SistemaVuelos expone un TDA para:
 // - guardar vuelos a partir de archivos CSV,
 // - buscarlos por código,
 // - listarlos ordenados por fecha,
 // - y desencolar por prioridad (filtrando duplicados)
-
 type SistemaVuelos struct{
 	porCodigo	Hash.Diccionario[string,vuelo.Vuelo]		
 	porFecha	Abb.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]
@@ -69,7 +29,6 @@ type SistemaVuelos struct{
 
 // CrearSistemaDeVuelos instancia el TDA vacío.
 func CrearSistemaDeVuelos() Aeropuerto{
-
 	return &SistemaVuelos{
 		porCodigo: Hash.CrearHash[string,vuelo.Vuelo](),
 		porFecha: Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave),
@@ -81,37 +40,29 @@ func CrearSistemaDeVuelos() Aeropuerto{
 // Si un vuelo ya existía (mismo código), se reemplaza la entrada anterior.
 func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error{
 	archivo, err := os.Open(nombreArchivo)
-
 	if err != nil{
-		return fmt.Errorf("no se pudo abrir el archivo: %w", err)
+		return fmt.Errorf("no se pudo abrir '%s': %w", nombreArchivo, err)
 	}
+
 	defer archivo.Close()
 
 	reader := csv.NewReader(archivo)
 	reader.Comma = ','
 
 	for {
-		linea, err := reader.Read()
-		if err == io.EOF{
+		registro, err := reader.Read()
+		if err == io.EOF {
 			break
 		}
-		if err != nil{
-			return fmt.Errorf("error leyendo el CSV: %w", err)
+		if err != nil {
+			return fmt.Errorf("error leyendo CSV: %w", err)
 		}
-		
-		v, err := parsearLineaCSV(linea)
+
+		vueloActual, err := parsearLineaCSV(registro)
 		if err != nil{
-			fmt.Println("Linea invalida")
 			continue
 		}
-		codigo := v.ObtenerCodigo()
-		if  sv.porCodigo.Pertenece(codigo){
-			vueloViejo := sv.porCodigo.Obtener(codigo)
-			sv.porFecha.Borrar(vueloViejo.ObtenerFecha())
-		}
-		sv.porCodigo.Guardar(codigo,v)
-		sv.porFecha.Guardar(v.ObtenerFecha(),v)
-		sv.porPrioridad.Encolar(v)
+		sv.agregarUnVuelo(vueloActual)
 	}
 	return nil
 }

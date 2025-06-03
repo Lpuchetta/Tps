@@ -1,46 +1,44 @@
 package tp2
-import(
-	"io"
-	"time"
-	"bufio"
+
+import (
 	"encoding/csv"
+	"fmt"
+	"io"
 	"os"
 	"strconv"
-	"fmt"
+	"time"
 
-
-	Hash	"tdas/diccionario"
-	Abb		"tdas/diccionario"
-	Heap	"tdas/heap"
-	vuelo	"tdas/tp2/vuelo"
+	Abb "tdas/diccionario"
+	Hash "tdas/diccionario"
+	Heap "tdas/heap"
+	vuelo "tdas/tp2/vuelo"
 )
-
 
 // SistemaVuelos expone un TDA para:
 // - guardar vuelos a partir de archivos CSV,
 // - buscarlos por código,
 // - listarlos ordenados por fecha,
 // - y desencolar por prioridad (filtrando duplicados)
-type SistemaVuelos struct{
-	porCodigo	Hash.Diccionario[string,vuelo.Vuelo]		
-	porFecha	Abb.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]
-	porPrioridad	Heap.ColaPrioridad[vuelo.Vuelo]
+type SistemaVuelos struct {
+	porCodigo    Hash.Diccionario[string, vuelo.Vuelo]
+	porFecha     Abb.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]
+	porPrioridad Heap.ColaPrioridad[vuelo.Vuelo]
 }
 
 // CrearSistemaDeVuelos instancia el TDA vacío.
-func CrearSistemaDeVuelos() Aeropuerto{
+func CrearSistemaDeVuelos() Aeropuerto {
 	return &SistemaVuelos{
-		porCodigo: Hash.CrearHash[string,vuelo.Vuelo](),
-		porFecha: Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave),
+		porCodigo:    Hash.CrearHash[string, vuelo.Vuelo](),
+		porFecha:     Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave),
 		porPrioridad: Heap.CrearHeap[vuelo.Vuelo](comparadorPrioridad),
 	}
 }
 
 // Agregar_Archivo lee el CSV completo y va insertando cada línea en el TDA.
 // Si un vuelo ya existía (mismo código), se reemplaza la entrada anterior.
-func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error{
+func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error {
 	archivo, err := os.Open(nombreArchivo)
-	if err != nil{
+	if err != nil {
 		return fmt.Errorf("no se pudo abrir '%s': %w", nombreArchivo, err)
 	}
 
@@ -59,7 +57,7 @@ func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error{
 		}
 
 		vueloActual, err := parsearLineaCSV(registro)
-		if err != nil{
+		if err != nil {
 			continue
 		}
 		sv.agregarUnVuelo(vueloActual)
@@ -67,8 +65,18 @@ func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error{
 	return nil
 }
 
-func parsearLineaCSV(linea []string)(vuelo.Vuelo, error){
-	if len(linea) < 10{
+func (sv *SistemaVuelos) Info_Vuelo(codigoVuelo string) {
+	if !sv.porCodigo.Pertenece(codigoVuelo) {
+		fmt.Printf("No se encontró vuelo con código %s\n", codigoVuelo)
+		return
+	}
+	vuelo := sv.porCodigo.Obtener(codigoVuelo)
+	vuelo.MostrarInfo()
+	fmt.Println("OK")
+}
+
+func parsearLineaCSV(linea []string) (vuelo.Vuelo, error) {
+	if len(linea) < 10 {
 		return nil, fmt.Errorf("error leyendo el archivo CSV")
 	}
 
@@ -82,8 +90,6 @@ func parsearLineaCSV(linea []string)(vuelo.Vuelo, error){
 	fecha, _ := time.Parse("2006-01-02T15:04:05", linea[6])
 	tiempoVuelo, _ := strconv.Atoi(linea[8])
 	cancelado := linea[9] == "1"
-	v := vuelo.CrearVuelo(codigoVuelo,aerolinea,origen,destino,matricula,prioridad,fecha,retraso,tiempoVuelo,cancelado)
+	v := vuelo.CrearVuelo(codigoVuelo, aerolinea, origen, destino, matricula, prioridad, fecha, retraso, tiempoVuelo, cancelado)
 	return v, nil
 }
-	
-	

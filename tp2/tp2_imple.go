@@ -65,6 +65,48 @@ func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error {
 	return nil
 }
 
+func (sv *SistemaVuelos) Ver_Tablero(K int, modo, desde, hasta string) {
+	if K <= 0 {
+		fmt.Println("Error: K inválido")
+		return
+	}
+
+	if modo != "asc" && modo != "desc" {
+		fmt.Println("Error: modo inválido")
+		return
+	}
+
+	fechaDesde, err1 := time.Parse("2006-01-02T15:04:05", desde)
+	fechaHasta, err2 := time.Parse("2006-01-02T15:04:05", hasta)
+	if err1 != nil || err2 != nil || fechaHasta.Before(fechaDesde) {
+		fmt.Println("Error: rango de fechas inválido")
+		return
+	}
+
+	claveDesde := FechaClave{Fecha: fechaDesde, Codigo: ""}
+	claveHasta := FechaClave{Fecha: fechaHasta, Codigo: "999999999999"}
+
+	resultados := make([]string, 0, K)
+
+	sv.porFecha.IterarRango(&claveDesde, &claveHasta, func(clave FechaClave, v vuelo.Vuelo) bool {
+		linea := fmt.Sprintf("%s - %s", clave.Fecha.Format("2006-01-02T15:04:05"), clave.Codigo)
+		resultados = append(resultados, linea)
+		return len(resultados) < K
+	})
+
+	if modo == "desc" {
+		for i := len(resultados) - 1; i >= 0; i-- {
+			fmt.Println(resultados[i])
+		}
+	} else {
+		for _, linea := range resultados {
+			fmt.Println(linea)
+		}
+	}
+
+	fmt.Println("OK")
+}
+
 func (sv *SistemaVuelos) Info_Vuelo(codigoVuelo string) {
 	if !sv.porCodigo.Pertenece(codigoVuelo) {
 		fmt.Printf("No se encontró vuelo con código %s\n", codigoVuelo)

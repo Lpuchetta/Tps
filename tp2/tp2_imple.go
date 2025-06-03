@@ -117,6 +117,33 @@ func (sv *SistemaVuelos) Info_Vuelo(codigoVuelo string) {
 	fmt.Println("OK")
 }
 
+func (sv *SistemaVuelos) Borrar(desde, hasta string) {
+	fechaDesde, err1 := time.Parse("2006-01-02T15:04:05", desde)
+	fechaHasta, err2 := time.Parse("2006-01-02T15:04:05", hasta)
+	if err1 != nil || err2 != nil || fechaHasta.Before(fechaDesde) {
+		fmt.Println("Error: rango de fechas inválido")
+		return
+	}
+
+	claveDesde := FechaClave{Fecha: fechaDesde, Codigo: ""}
+	claveHasta := FechaClave{Fecha: fechaHasta, Codigo: "999999999999"}
+
+	clavesABorrar := make([]FechaClave, 0)
+
+	sv.porFecha.IterarRango(&claveDesde, &claveHasta, func(clave FechaClave, v vuelo.Vuelo) bool {
+		fmt.Println(v.MostrarInfo())
+		clavesABorrar = append(clavesABorrar, clave)
+		return true
+	})
+
+	for _, clave := range clavesABorrar {
+		sv.porFecha.Borrar(clave)
+		sv.porCodigo.Borrar(clave.Codigo)
+	}
+
+	fmt.Println("OK")
+}
+
 func parsearLineaCSV(linea []string) (vuelo.Vuelo, error) {
 	if len(linea) < 10 {
 		return nil, fmt.Errorf("error leyendo el archivo CSV")

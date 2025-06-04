@@ -144,6 +144,30 @@ func (sv *SistemaVuelos) Borrar(desde, hasta string) {
 	fmt.Println("OK")
 }
 
+func (sv *SistemaVuelos) Prioridad_Vuelos(k int) {
+	// Se impl el algoritmo topK => heapify + desencolar k veces del heap
+	vuelos := make([]vuelo.Vuelo, 0)
+	for it := sv.porCodigo.Iterador(); it.HaySiguiente(); it.Siguiente() {
+		_, vuelo := it.VerActual()
+		vuelos = append(vuelos, vuelo)
+	}
+
+	heap := Heap.CrearHeapArr(vuelos, func(vuelo, otro vuelo.Vuelo) int {
+		return vuelo.ObtenerPrioridad() - otro.ObtenerPrioridad()
+	})
+
+	if k > len(vuelos) {
+		k = len(vuelos)
+	}
+
+	for i := 0; i < k; i++ {
+		v := heap.Desencolar()
+		fmt.Println(v.ObtenerPrioridad(), v.ObtenerCodigo())
+	}
+
+	fmt.Println("OK")
+}
+
 func parsearLineaCSV(linea []string) (vuelo.Vuelo, error) {
 	if len(linea) < 10 {
 		return nil, fmt.Errorf("error leyendo el archivo CSV")

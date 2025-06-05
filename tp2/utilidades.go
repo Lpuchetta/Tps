@@ -5,7 +5,7 @@ import(
 	"fmt"
 	"strconv"
 	"time"
-
+	Abb "tdas/diccionario"
 	vuelo "tdas/tp2/vuelo"
 )
 
@@ -28,7 +28,7 @@ func comparadorFechaClave(a, b FechaClave) int{
 	if a.Codigo < b.Codigo{
 		return -1
 	}else if a.Codigo > b.Codigo{
-		return -1
+		return 1
 	}
 	return 0
 }
@@ -64,4 +64,19 @@ func (sv *SistemaVuelos) agregarUnVuelo(v vuelo.Vuelo){
 	sv.porFecha.Guardar(claveNueva, v)
 
 	sv.porPrioridad.Encolar(v)
+
+	claveConexion := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
+	if !sv.porConexion.Pertenece(claveConexion) {
+		sv.porConexion.Guardar(claveConexion, Abb.CrearABB[time.Time, vuelo.Vuelo] (func(a, b time.Time) int{
+			if a.Before(b){
+				return -1
+			}
+			if a.After(b){
+				return 1
+			}
+			return 0
+		}))
+	}
+	abb := sv.porConexion.Obtener(claveConexion)
+	abb.Guardar(v.ObtenerFecha(), v)
 }

@@ -65,4 +65,3 @@ func (sv *SistemaVuelos) agregarUnVuelo(v vuelo.Vuelo){
 
 	sv.porPrioridad.Encolar(v)
 }
-

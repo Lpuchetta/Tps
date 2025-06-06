@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"time"
 
 	Abb "tdas/diccionario"
@@ -38,7 +37,7 @@ func CrearSistemaDeVuelos() Aeropuerto {
 
 // Agregar_Archivo lee el CSV completo y va insertando cada línea en el TDA.
 // Si un vuelo ya existía (mismo código), se reemplaza la entrada anterior.
-func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error {
+func (sv *SistemaVuelos) agregar_archivo(nombreArchivo string) error {
 	archivo, err := os.Open(nombreArchivo)
 	if err != nil {
 		return fmt.Errorf("no se pudo abrir '%s': %w", nombreArchivo, err)
@@ -58,16 +57,16 @@ func (sv *SistemaVuelos) Agregar_Archivo(nombreArchivo string) error {
 			return fmt.Errorf("error leyendo CSV: %w", err)
 		}
 
-		vueloActual, err := parsearLineaCSV(registro)
+		vueloActual, err := vuelo.ParsearLineaCSV(registro) //En archivo vuelo/parsing_vuelo.go
 		if err != nil {
 			continue
 		}
-		sv.agregarUnVuelo(vueloActual)
+		sv.agregarUnVuelo(vueloActual) //En archivo utilidades.go
 	}
 	return nil
 }
 
-func (sv *SistemaVuelos) Ver_Tablero(K int, modo, desde, hasta string) {
+func (sv *SistemaVuelos) ver_tablero(K int, modo, desde, hasta string) {
 	if K <= 0 {
 		fmt.Println("Error: K inválido")
 		return
@@ -109,7 +108,7 @@ func (sv *SistemaVuelos) Ver_Tablero(K int, modo, desde, hasta string) {
 	fmt.Println("OK")
 }
 
-func (sv *SistemaVuelos) Info_Vuelo(codigoVuelo string) {
+func (sv *SistemaVuelos) info_vuelo(codigoVuelo string) {
 	if !sv.porCodigo.Pertenece(codigoVuelo) {
 		fmt.Printf("No se encontró vuelo con código %s\n", codigoVuelo)
 		return
@@ -119,7 +118,7 @@ func (sv *SistemaVuelos) Info_Vuelo(codigoVuelo string) {
 	fmt.Println("OK")
 }
 
-func (sv *SistemaVuelos) Borrar(desde, hasta string) {
+func (sv *SistemaVuelos) borrar(desde, hasta string) {
 	fechaDesde, err1 := time.Parse("2006-01-02T15:04:05", desde)
 	fechaHasta, err2 := time.Parse("2006-01-02T15:04:05", hasta)
 	if err1 != nil || err2 != nil || fechaHasta.Before(fechaDesde) {
@@ -146,7 +145,7 @@ func (sv *SistemaVuelos) Borrar(desde, hasta string) {
 	fmt.Println("OK")
 }
 
-func (sv *SistemaVuelos) Prioridad_Vuelos(k int) {
+func (sv *SistemaVuelos) prioridad_vuelos(k int) {
 	// Se impl el algoritmo topK => heapify + desencolar k veces del heap
 	vuelos := make([]vuelo.Vuelo, 0)
 	for it := sv.porCodigo.Iterador(); it.HaySiguiente(); it.Siguiente() {
@@ -170,7 +169,7 @@ func (sv *SistemaVuelos) Prioridad_Vuelos(k int) {
 	fmt.Println("OK")
 }
 
-func (sv *SistemaVuelos) Siguiente_Vuelo(origen, destino, fecha string) {
+func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fecha string) {
 	fechaBuscada, err := time.Parse("2006-01-02T15:04:05", fecha)
 	if err != nil{
 		fmt.Println("Error: Fecha invalida")
@@ -197,23 +196,4 @@ func (sv *SistemaVuelos) Siguiente_Vuelo(origen, destino, fecha string) {
 	}
 
 	fmt.Println("OK")
-}
-
-func parsearLineaCSV(linea []string) (vuelo.Vuelo, error) {
-	if len(linea) < 10 {
-		return nil, fmt.Errorf("error leyendo el archivo CSV")
-	}
-
-	codigoVuelo := linea[0]
-	aerolinea := linea[1]
-	origen := linea[2]
-	destino := linea[3]
-	matricula := linea[4]
-	prioridad, _ := strconv.Atoi(linea[5])
-	retraso, _ := strconv.Atoi(linea[7])
-	fecha, _ := time.Parse("2006-01-02T15:04:05", linea[6])
-	tiempoVuelo, _ := strconv.Atoi(linea[8])
-	cancelado := linea[9] == "1"
-	v := vuelo.CrearVuelo(codigoVuelo, aerolinea, origen, destino, matricula, prioridad, fecha, retraso, tiempoVuelo, cancelado)
-	return v, nil
 }

@@ -1,9 +1,6 @@
 package tp2
 
 import(
-	"encoding/csv"
-	"fmt"
-	"strconv"
 	"time"
 	Abb "tdas/diccionario"
 	vuelo "tdas/tp2/vuelo"
@@ -79,4 +76,5 @@ func (sv *SistemaVuelos) agregarUnVuelo(v vuelo.Vuelo){
 	}
 	abb := sv.porConexion.Obtener(claveConexion)
 	abb.Guardar(v.ObtenerFecha(), v)
+	sv.porConexion.Guardar(claveConexion,abb)
 }

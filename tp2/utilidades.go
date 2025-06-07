@@ -14,6 +14,7 @@ type FechaClave struct{
 }
 
 // comparadorFechaClave compara primero por fecha y ordena por esta misma, si no por Codigo
+// comparadorFechaClave compara primero por fecha y ordena por esta misma, si no por Codigo
 func comparadorFechaClave(a, b FechaClave) int{
 	if a.Fecha.Before(b.Fecha){
 		return -1
@@ -63,17 +64,10 @@ func (sv *SistemaVuelos) agregarUnVuelo(v vuelo.Vuelo){
 
 	claveConexion := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
 	if !sv.porConexion.Pertenece(claveConexion) {
-		sv.porConexion.Guardar(claveConexion, Abb.CrearABB[time.Time, vuelo.Vuelo] (func(a, b time.Time) int{
-			if a.Before(b){
-				return -1
-			}
-			if a.After(b){
-				return 1
-			}
-			return 0
-		}))
+		sv.porConexion.Guardar(claveConexion, Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave))
 	}
 	abb := sv.porConexion.Obtener(claveConexion)
-	abb.Guardar(v.ObtenerFecha(), v)
-	sv.porConexion.Guardar(claveConexion,abb)
+	claveVuelo := FechaClave{Fecha: v.ObtenerFecha(), Codigo: codigo}
+	abb.Guardar(claveVuelo, v)
+	sv.porConexion.Guardar(claveConexion, abb)
 }

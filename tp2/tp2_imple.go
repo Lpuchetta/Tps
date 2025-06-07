@@ -1,4 +1,4 @@
-package tp2
+package main
 
 import (
 	"encoding/csv"
@@ -10,7 +10,7 @@ import (
 	Abb "tdas/diccionario"
 	Hash "tdas/diccionario"
 	Heap "tdas/heap"
-	vuelo "tdas/tp2/vuelo"
+	vuelo "tp2/vuelo"
 )
 
 // SistemaVuelos expone un TDA para:
@@ -146,28 +146,33 @@ func (sv *SistemaVuelos) borrar(desde, hasta string) {
 }
 
 func (sv *SistemaVuelos) prioridad_vuelos(k int) {
-	// Se impl el algoritmo topK => heapify + desencolar k veces del heap
-	vuelos := make([]vuelo.Vuelo, 0)
-	for it := sv.porCodigo.Iterador(); it.HaySiguiente(); it.Siguiente() {
-		_, vuelo := it.VerActual()
-		vuelos = append(vuelos, vuelo)
-	}
+    vuelos := make([]vuelo.Vuelo, 0)
+    for it := sv.porCodigo.Iterador(); it.HaySiguiente(); it.Siguiente() {
+        _, v := it.VerActual()
+        vuelos = append(vuelos, v)
+    }
 
-	heap := Heap.CrearHeapArr(vuelos, func(vuelo, otro vuelo.Vuelo) int {
-		return vuelo.ObtenerPrioridad() - otro.ObtenerPrioridad()
-	})
 
-	if k > len(vuelos) {
-		k = len(vuelos)
-	}
+    h := Heap.CrearHeapArr(vuelos, comparadorPrioridad)
 
-	for i := 0; i < k; i++ {
-		v := heap.Desencolar()
-		fmt.Println(v.ObtenerPrioridad(), v.ObtenerCodigo())
-	}
+
+    if k > len(vuelos) {
+        k = len(vuelos)
+    }
+
+    temp := make([]vuelo.Vuelo, 0, k)
+    for i := 0; i < k; i++ {
+        temp = append(temp, h.Desencolar())
+    }
+
+    for i := k - 1; i >= 0; i-- {
+        v := temp[i]
+        fmt.Printf("%d - %s\n", v.ObtenerPrioridad(), v.ObtenerCodigo())
+    }
 
 	fmt.Println("OK")
 }
+
 
 func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fecha string) {
 	fechaBuscada, err := time.Parse("2006-01-02T15:04:05", fecha)

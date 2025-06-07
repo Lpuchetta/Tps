@@ -59,8 +59,6 @@ func (sv *SistemaVuelos) agregarUnVuelo(v vuelo.Vuelo) {
 	claveNueva := FechaClave{Fecha: v.ObtenerFecha(), Codigo: codigo}
 	sv.porFecha.Guardar(claveNueva, v)
 
-	sv.porPrioridad.Encolar(v)
-
 	claveConexion := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
 	if !sv.porConexion.Pertenece(claveConexion) {
 		sv.porConexion.Guardar(claveConexion, Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave))

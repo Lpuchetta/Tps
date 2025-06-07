@@ -28,10 +28,9 @@ type SistemaVuelos struct {
 // CrearSistemaDeVuelos instancia el TDA vacío.
 func CrearSistemaDeVuelos() Aeropuerto {
 	return &SistemaVuelos{
-		porCodigo:    Hash.CrearHash[string, vuelo.Vuelo](),
-		porFecha:     Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave),
-		porPrioridad: Heap.CrearHeap[vuelo.Vuelo](comparadorPrioridad),
-		porConexion:  Hash.CrearHash[string, Abb.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]](),
+		porCodigo:   Hash.CrearHash[string, vuelo.Vuelo](),
+		porFecha:    Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave),
+		porConexion: Hash.CrearHash[string, Abb.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]](),
 	}
 }
 
@@ -63,17 +62,20 @@ func (sv *SistemaVuelos) agregar_archivo(nombreArchivo string) error {
 		}
 		sv.agregarUnVuelo(vueloActual) //En archivo utilidades.go
 	}
+	fmt.Println("OK")
 	return nil
 }
 
 func (sv *SistemaVuelos) ver_tablero(K int, modo, desde, hasta string) {
 	if K <= 0 {
 		fmt.Println("Error: K inválido")
+		fmt.Println("OK")
 		return
 	}
 
 	if modo != "asc" && modo != "desc" {
 		fmt.Println("Error: modo inválido")
+		fmt.Println("OK")
 		return
 	}
 
@@ -81,6 +83,7 @@ func (sv *SistemaVuelos) ver_tablero(K int, modo, desde, hasta string) {
 	fechaHasta, err2 := time.Parse("2006-01-02T15:04:05", hasta)
 	if err1 != nil || err2 != nil || fechaHasta.Before(fechaDesde) {
 		fmt.Println("Error: rango de fechas inválido")
+		fmt.Println("OK")
 		return
 	}
 
@@ -104,67 +107,83 @@ func (sv *SistemaVuelos) ver_tablero(K int, modo, desde, hasta string) {
 			fmt.Println(linea)
 		}
 	}
+	fmt.Println("OK")
 
 }
 
 func (sv *SistemaVuelos) info_vuelo(codigoVuelo string) {
 	if !sv.porCodigo.Pertenece(codigoVuelo) {
 		fmt.Printf("No se encontró vuelo con código %s\n", codigoVuelo)
-		return
+	} else {
+		vuelo := sv.porCodigo.Obtener(codigoVuelo)
+		fmt.Println(vuelo.MostrarInfo())
 	}
-	vuelo := sv.porCodigo.Obtener(codigoVuelo)
-	fmt.Println(vuelo.MostrarInfo())
+	fmt.Println("OK")
 }
 
 func (sv *SistemaVuelos) borrar(desde, hasta string) {
-	fechaDesde, err1 := time.Parse("2006-01-02T15:04:05", desde)
-	fechaHasta, err2 := time.Parse("2006-01-02T15:04:05", hasta)
-	if err1 != nil || err2 != nil || fechaHasta.Before(fechaDesde) {
-		fmt.Println("Error: rango de fechas inválido")
-		return
-	}
+	fechaDesde, _ := time.Parse("2006-01-02T15:04:05", desde)
+	fechaHasta, _ := time.Parse("2006-01-02T15:04:05", hasta)
 
 	claveDesde := FechaClave{Fecha: fechaDesde, Codigo: ""}
 	claveHasta := FechaClave{Fecha: fechaHasta, Codigo: "999999999999"}
 
 	clavesABorrar := make([]FechaClave, 0)
+	vuelosABorrar := make([]vuelo.Vuelo, 0)
 
 	sv.porFecha.IterarRango(&claveDesde, &claveHasta, func(clave FechaClave, v vuelo.Vuelo) bool {
 		fmt.Println(v.MostrarInfo())
 		clavesABorrar = append(clavesABorrar, clave)
+		vuelosABorrar = append(vuelosABorrar, v)
 		return true
 	})
 
-	for _, clave := range clavesABorrar {
+	for i, clave := range clavesABorrar {
+		v := vuelosABorrar[i]
+
 		sv.porFecha.Borrar(clave)
 		sv.porCodigo.Borrar(clave.Codigo)
-	}
 
+		claveConexion := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
+		if sv.porConexion.Pertenece(claveConexion) {
+			abb := sv.porConexion.Obtener(claveConexion)
+			abb.Borrar(clave)
+			if abb.Cantidad() == 0 {
+				sv.porConexion.Borrar(claveConexion)
+			}
+		}
+	}
+	fmt.Println("OK")
 }
 
 func (sv *SistemaVuelos) prioridad_vuelos(k int) {
-	vuelos := make([]vuelo.Vuelo, 0)
-	for it := sv.porCodigo.Iterador(); it.HaySiguiente(); it.Siguiente() {
-		_, v := it.VerActual()
-		vuelos = append(vuelos, v)
+	comparador := func(v1, v2 vuelo.Vuelo) int {
+		p1, p2 := v1.ObtenerPrioridad(), v2.ObtenerPrioridad()
+		if p1 != p2 {
+			return p2 - p1
+		}
+
+		if v1.ObtenerCodigo() < v2.ObtenerCodigo() {
+			return -1
+		} else if v1.ObtenerCodigo() > v2.ObtenerCodigo() {
+			return 1
+		}
+		return 0
 	}
 
-	h := Heap.CrearHeapArr(vuelos, comparadorPrioridad)
-
-	if k > len(vuelos) {
-		k = len(vuelos)
+	h := Heap.CrearHeap(comparador)
+	iter := sv.porCodigo.Iterador()
+	for iter.HaySiguiente() {
+		_, vuelo := iter.VerActual()
+		h.Encolar(vuelo)
+		iter.Siguiente()
 	}
 
-	temp := make([]vuelo.Vuelo, 0, k)
-	for i := 0; i < k; i++ {
-		temp = append(temp, h.Desencolar())
-	}
-
-	for i := k - 1; i >= 0; i-- {
-		v := temp[i]
+	for i := 0; i < k && !h.EstaVacia(); i++ {
+		v := h.Desencolar()
 		fmt.Printf("%d - %s\n", v.ObtenerPrioridad(), v.ObtenerCodigo())
 	}
-
+	fmt.Println("OK")
 }
 
 func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fecha string) {
@@ -193,4 +212,5 @@ func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fecha string) {
 	if !encontrado {
 		fmt.Printf("No hay vuelo registrado desde %s hacia %s desde %s\n", origen, destino, fecha)
 	}
+	fmt.Println("OK")
 }

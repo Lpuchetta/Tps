@@ -1,9 +1,9 @@
-package tp2
+package main
 
 import(
 	"time"
 	Abb "tdas/diccionario"
-	vuelo "tdas/tp2/vuelo"
+	vuelo "tp2/vuelo"
 )
 
 // FechaClave se usa para ordenar en el ABB
@@ -30,19 +30,18 @@ func comparadorFechaClave(a, b FechaClave) int{
 	return 0
 }
 
-// compradorPrioridad compara primero por prioridad, en caso de empate compara por codigo.
-func comparadorPrioridad(v1, v2 vuelo.Vuelo) int{
-	diff := v1.ObtenerPrioridad() - v2.ObtenerPrioridad()
-	if diff != 0{
-		return diff
-	}
-
-	if v1.ObtenerCodigo() < v2.ObtenerCodigo(){
-		return 1
-	} else if v1.ObtenerCodigo() > v2.ObtenerCodigo(){
-		return -1
-	}
-	return 0
+func comparadorPrioridad(v1, v2 vuelo.Vuelo) int {
+    p1, p2 := v1.ObtenerPrioridad(), v2.ObtenerPrioridad()
+    if p1 != p2 {
+        // “menor” debe ser quien tiene MENOS prioridad
+        return p1 - p2
+    }
+    if v1.ObtenerCodigo() > v2.ObtenerCodigo() {
+        return 1
+    } else if v1.ObtenerCodigo() < v2.ObtenerCodigo() {
+        return -1
+    }
+    return 0
 }
 
 

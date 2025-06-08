@@ -45,6 +45,7 @@ func (v *vuelo) EstaCancelado() bool {
 	return v.cancelado
 }
 
+// imple_vuelos.go
 func (v *vuelo) MostrarInfo() string {
 	return fmt.Sprintf("%s %s %s %s %s %d %s %d %d %s",
 		v.codigo,
@@ -59,7 +60,6 @@ func (v *vuelo) MostrarInfo() string {
 		boolComoString(v.cancelado),
 	)
 }
-
 func (v *vuelo) ObtenerRetraso() int {
 	return v.retraso
 }

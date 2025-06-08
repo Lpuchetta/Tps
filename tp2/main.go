@@ -13,48 +13,43 @@ func main() {
 	sv := CrearSistemaDeVuelos()
 	scanner := bufio.NewScanner(os.Stdin)
 
-	for {
-		if !scanner.Scan() {
-			break
-		}
+	for scanner.Scan() {
 		linea := scanner.Text()
 		partes := strings.Fields(linea)
-
 		if len(partes) == 0 {
 			continue
 		}
 
-		comando := strings.ToLower(partes[0])
-
+		comando := partes[0]
 		switch comando {
 		case "agregar_archivo":
 			if len(partes) < 2 {
-				fmt.Println("Error: falta nombre de archivo")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 			archivo := partes[1]
 			err := sv.agregar_archivo(archivo)
 			if err != nil {
-				fmt.Println("Error agregando archivo:", err)
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 			} else {
 				fmt.Println("OK")
 			}
 
 		case "ver_tablero":
 			if len(partes) < 5 {
-				fmt.Println("Error: ver_tablero requiere 4 argumentos: K modo desde hasta")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 
 			K, err := strconv.Atoi(partes[1])
 			if err != nil || K <= 0 {
-				fmt.Println("Error: K debe ser un número entero mayor a 0")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 
 			modo := strings.ToLower(partes[2])
 			if modo != "asc" && modo != "desc" {
-				fmt.Println("Error: modo debe ser 'asc' o 'desc'")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 
@@ -65,17 +60,13 @@ func main() {
 			desde, errDesde := time.Parse(layout, desdeStr)
 			hasta, errHasta := time.Parse(layout, hastaStr)
 
-			if errDesde != nil {
-				fmt.Println("Error: formato inválido para 'desde'. Debe ser YYYY-MM-DDTHH:MM:SS")
-				continue
-			}
-			if errHasta != nil {
-				fmt.Println("Error: formato inválido para 'hasta'. Debe ser YYYY-MM-DDTHH:MM:SS")
+			if errDesde != nil || errHasta != nil {
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 
 			if hasta.Before(desde) {
-				fmt.Println("Error: 'hasta' no puede ser anterior a 'desde'")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 
@@ -83,7 +74,7 @@ func main() {
 
 		case "info_vuelo":
 			if len(partes) < 2 {
-				fmt.Println("Error: falta el código de vuelo")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 			codigo := partes[1]
@@ -91,19 +82,19 @@ func main() {
 
 		case "prioridad_vuelos":
 			if len(partes) < 2 {
-				fmt.Println("Error: falta K (cantidad de vuelos)")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 			K, err := strconv.Atoi(partes[1])
 			if err != nil || K <= 0 {
-				fmt.Println("K inválido. Debe ser un número entero mayor a 0.")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 			sv.prioridad_vuelos(K)
 
 		case "siguiente_vuelo":
 			if len(partes) < 4 {
-				fmt.Println("Error: siguiente_vuelo requiere 3 argumentos: origen destino fecha")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 
@@ -114,7 +105,7 @@ func main() {
 			const layout = "2006-01-02T15:04:05"
 			_, err := time.Parse(layout, fechaStr)
 			if err != nil {
-				fmt.Println("Error: formato inválido de fecha. Debe ser YYYY-MM-DDTHH:MM:SS")
+				fmt.Fprintln(os.Stderr, "Error en comando", comando)
 				continue
 			}
 
@@ -144,8 +135,9 @@ func main() {
 			}
 
 			sv.borrar(desdeStr, hastaStr)
+
 		default:
-			fmt.Println("Comando desconocido")
+			fmt.Fprintln(os.Stderr, "Error en comando", comando)
 		}
 	}
 }

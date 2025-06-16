@@ -16,12 +16,10 @@ func ParsearLineaCSV(linea []string) (Vuelo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("prioridad inválida: %w", err)
 	}
-
 	retraso, err := strconv.Atoi(linea[7])
 	if err != nil {
-		return nil, fmt.Errorf("retraso inválido: %w", err)
+		return nil, fmt.Errorf("retraso invalido: %w", err)
 	}
-
 	fecha, err := time.Parse("2006-01-02T15:04:05", linea[6])
 	if err != nil {
 		return nil, fmt.Errorf("fecha inválida: %w", err)

@@ -63,7 +63,6 @@ func (v *vuelo) MostrarInfo() string {
 func (v *vuelo) ObtenerRetraso() int {
 	return v.retraso
 }
-
 func (v *vuelo) ObtenerTiempoVuelo() int {
 	return v.tiempoVuelo
 }

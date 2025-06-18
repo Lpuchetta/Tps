@@ -1,0 +1,20 @@
+# Ignorar directorios de pruebas de “algueiza”
+pruebas_algueiza/
+
+# Ignorar todo lo dentro de tp2 que no forme parte del código fuente
+tp2/*.csv
+tp2/*.txt
+tp2/__debug_bin*
+tp2/programa
+tp2/temporal.txt
+
+# Ignorar carpetas de configuración de VSCode
+.vscode/
+flycombi/.vscode/
+
+# Ignorar archivos Debian de VSCode
+*.deb
+
+# (Opcional) Ignorar archivos compilados o de cache
+__pycache__/
+*.pyc

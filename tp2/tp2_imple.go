@@ -22,7 +22,7 @@ type SistemaVuelos struct {
 	porFechaAsc  Dict.DiccionarioOrdenado[time.Time, Lista.Lista[vuelo.Vuelo]]
 	porFechaDesc Dict.DiccionarioOrdenado[time.Time, Lista.Lista[vuelo.Vuelo]]
 	porConexion  Dict.Diccionario[string, Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]]
-	porPrioridad Dict.DiccionarioOrdenado[PrioridadClave, vuelo.Vuelo]
+	porPrioridad Dict.DiccionarioOrdenado[int, Lista.Lista[string]]
 }
 
 func CrearSistemaDeVuelos() *SistemaVuelos {
@@ -31,7 +31,7 @@ func CrearSistemaDeVuelos() *SistemaVuelos {
 		porFechaAsc:  Dict.CrearABB[time.Time, Lista.Lista[vuelo.Vuelo]](compararTimeAsc),
 		porFechaDesc: Dict.CrearABB[time.Time, Lista.Lista[vuelo.Vuelo]](compararTimeDesc),
 		porConexion:  Dict.CrearHash[string, Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]](),
-		porPrioridad: Dict.CrearABB[PrioridadClave, vuelo.Vuelo](cmpPrioridadClave),
+		porPrioridad: Dict.CrearABB[int, Lista.Lista[string]](compararIntDesc),
 	}
 }
 
@@ -61,10 +61,8 @@ func (sv *SistemaVuelos) ver_tablero(K int, modo, desde, hasta string) {
 
 	var resultados []string
 	if modo == "asc" {
-		// árbol ascendente, lista de códigos ascendente
 		resultados = sv.obtenerTablero(sv.porFechaAsc, fechaDesde, fechaHasta, K, true)
 	} else {
-		// árbol descendente, lista de códigos descendente
 		resultados = sv.obtenerTablero(sv.porFechaDesc, fechaHasta, fechaDesde, K, false)
 	}
 
@@ -85,68 +83,44 @@ func (sv *SistemaVuelos) info_vuelo(codigoVuelo string) {
 }
 
 func (sv *SistemaVuelos) borrar(desde, hasta string) {
-    // Parseo de fechas (puedes añadir chequeo de errores si lo deseas)
     fechaDesde, _ := time.Parse("2006-01-02T15:04:05", desde)
     fechaHasta, _ := time.Parse("2006-01-02T15:04:05", hasta)
 
-    // 1) Recolectar fechas donde hay vuelos a eliminar (con sus vuelos).
     var fechasAEliminar []time.Time
     sv.porFechaAsc.IterarRango(&fechaDesde, &fechaHasta, func(fecha time.Time, lista Lista.Lista[vuelo.Vuelo]) bool {
-        iter := lista.Iterador()
-        for iter.HaySiguiente() {
-            v := iter.VerActual()
-            // 1.1) Imprimir info del vuelo
+        for it := lista.Iterador(); it.HaySiguiente(); it.Siguiente() {
+            v := it.VerActual()
             fmt.Println(v.MostrarInfo())
-            // 1.2) Borrar de índice porCódigo
-            sv.porCodigo.Borrar(v.ObtenerCodigo())
-            // 1.3) Borrar de índice porPrioridad
-            prioridadClave := PrioridadClave{
-                Prioridad: v.ObtenerPrioridad(),
-                Codigo:    v.ObtenerCodigo(),
-            }
-            sv.porPrioridad.Borrar(prioridadClave)
-            // 1.4) Borrar de índice porConexion
-            connKey := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
-            if sv.porConexion.Pertenece(connKey) {
-                abbConn := sv.porConexion.Obtener(connKey)
-                fechaClave := FechaClave{Fecha: v.ObtenerFecha(), Codigo: v.ObtenerCodigo()}
-                abbConn.Borrar(fechaClave)
-                // Si ya no hay vuelos para esa ruta, eliminar la entrada completa
-                if abbConn.Cantidad() == 0 {
-                    sv.porConexion.Borrar(connKey)
-                }
-            }
-            iter.Siguiente()
+            sv.eliminarIndices(v)
         }
-        // Marca esta fecha para eliminar todo el nodo del ABB
         fechasAEliminar = append(fechasAEliminar, fecha)
         return true
     })
 
-    // 2) Borrar cada nodo de fecha de ambos ABB:
     for _, f := range fechasAEliminar {
         sv.porFechaAsc.Borrar(f)
         sv.porFechaDesc.Borrar(f)
     }
 
-    // 3) Confirmación de fin de comando
     fmt.Println("OK")
 }
 
-
-
 func (sv *SistemaVuelos) prioridad_vuelos(k int) {
-	maxKey := PrioridadClave{Prioridad: math.MaxInt, Codigo: _MIN_CODE_ITERADORES}
-	minKey := PrioridadClave{Prioridad: math.MinInt, Codigo: _MAX_CODE_ITERADORES}
-	conteo := 0
-
-	sv.porPrioridad.IterarRango(&maxKey, &minKey, func(cl PrioridadClave, v vuelo.Vuelo) bool {
-		fmt.Printf("%d - %s\n", cl.Prioridad, cl.Codigo)
-		conteo++
-		return conteo < k
-	})
+    minPrio := math.MinInt
+    count := 0
+	sv.porPrioridad.IterarRango(nil, &minPrio, func(prio int, lst Lista.Lista[string]) bool {
+        iter := lst.Iterador()
+        for iter.HaySiguiente() && count < k {
+            codigo := iter.VerActual()
+            fmt.Printf("%d - %s\n", prio, codigo)
+            count++
+            iter.Siguiente()
+        }
+        return count < k
+    })
 	fmt.Println("OK")
 }
+
 
 func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fechaStr string) {
     connKey := origen + "-" + destino
@@ -158,15 +132,13 @@ func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fechaStr string) {
         return
     }
     abb := sv.porConexion.Obtener(connKey)
-    // Arrancamos justo *después* de 'fecha',
-    // usando el código máximo para saltar también los de la misma fecha
     claveDesde := FechaClave{Fecha: fecha, Codigo: _MAX_CODE_ITERADORES}
 
     encontrado := false
     abb.IterarRango(&claveDesde, nil, func(clave FechaClave, v vuelo.Vuelo) bool {
         fmt.Println(v.MostrarInfo())
         encontrado = true
-        return false // dejamos de iterar tras encontrar el primero
+        return false
     })
     if !encontrado {
         fmt.Printf("No hay vuelo registrado desde %s hacia %s desde %s\n", origen, destino, fechaStr)
@@ -193,6 +165,5 @@ func (sv *SistemaVuelos) obtenerTablero(arbol Dict.DiccionarioOrdenado[time.Time
 		}
 		return len(resultados) < K
 	})
-
 	return resultados
 }

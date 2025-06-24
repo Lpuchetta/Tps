@@ -3,100 +3,86 @@ package main
 import (
 	"strings"
 	Abb "tdas/diccionario"
+	Lista "tdas/lista"
 	"time"
 	vuelo "tp2/vuelo"
 )
 
-type vueloConFecha struct {
-	fecha  time.Time
-	codigo string
-	info   string
-}
-
-// FechaClave se usa para ordenar en el ABB
-// Se ordena por fecha, y si coinciden, por el codigo
 type FechaClave struct {
 	Fecha  time.Time
 	Codigo string
 }
-
 type PrioridadClave struct {
 	Prioridad int
-	Codigo string
+	Codigo    string
 }
 
-func cmpPrioridadClave(a, b PrioridadClave) int{
-	if a.Prioridad != b.Prioridad{
-		if a.Prioridad > b.Prioridad{
-			return -1
-		}
-		return 1
-	}
-	if a.Codigo < b.Codigo{
+func compararIntAsc(a, b int) int {
+	if a < b {
 		return -1
-	} else if a.Codigo > b.Codigo{
+	}
+	if a > b {
 		return 1
 	}
 	return 0
 }
-// Para ver_tablero.
-func cmpVueloConFechaAsc(a, b vueloConFecha) int {
-	if a.fecha.Before(b.fecha) {
-		return -1
-	}
-	if a.fecha.After(b.fecha) {
+func compararIntDesc(a, b int) int {
+	if a < b {
 		return 1
 	}
-	return strings.Compare(a.codigo, b.codigo)
-}
-
-func cmpFechaClaveAsc(a,b FechaClave) int{
-	if a.Fecha.Before(b.Fecha){
+	if a > b {
 		return -1
-	}
-	if a.Fecha.After(b.Fecha){
-		return 1
-	}
-	if a.Codigo < b.Codigo{
-		return -1
-	}
-	if a.Codigo > b.Codigo{
-		return 1
 	}
 	return 0
 }
 
-func cmpFechaClaveDesc(a,b FechaClave) int{
-	if a.Fecha.Before(b.Fecha){
-		return 1
-	}
-	if a.Fecha.After(b.Fecha){
-		return -1
-	}
-	if a.Codigo < b.Codigo{
-		return 1
-	}
-	if a.Codigo > b.Codigo{
-		return -1
-	}
-	return 0
+func compararStringAsc(a, b string) int {
+	return strings.Compare(a, b)
 }
-// Para el ABB de porConexion (fecha + código)
-func comparadorFechaClave(a, b FechaClave) int {
-	if a.Fecha.Before(b.Fecha) {
+
+func compararStringsDesc(a, b string) int {
+	return -strings.Compare(a, b)
+}
+
+func compararTimeAsc(a, b time.Time) int {
+	if a.Before(b) {
 		return -1
 	}
-	if a.Fecha.After(b.Fecha) {
-		return 1
-	}
-	if a.Codigo < b.Codigo {
-		return -1
-	}
-	if a.Codigo > b.Codigo {
+	if a.After(b) {
 		return 1
 	}
 	return 0
 }
+func compararTimeDesc(a, b time.Time) int {
+	if a.Before(b) {
+		return 1
+	}
+	if a.After(b) {
+		return -1
+	}
+	return 0
+}
+
+func cmpPrioridadClave(a, b PrioridadClave) int {
+	if cmp := compararIntDesc(a.Prioridad, b.Prioridad); cmp != 0 {
+		return cmp
+	}
+	return compararStringAsc(a.Codigo, b.Codigo)
+}
+
+func cmpFechaClaveAsc(a, b FechaClave) int {
+	if cmp := compararTimeAsc(a.Fecha, b.Fecha); cmp != 0 {
+		return cmp
+	}
+	return compararStringAsc(a.Codigo, b.Codigo)
+}
+
+/*func cmpFechaClaveDesc(a, b FechaClave) int {
+	if cmp := compararTimeDesc(a.Fecha, b.Fecha); cmp != 0 {
+		return cmp
+	}
+	return compararStringsDesc(a.Codigo, b.Codigo)
+}*/
 
 func generarClaveFecha(v vuelo.Vuelo) FechaClave {
 	return FechaClave{Fecha: v.ObtenerFecha(), Codigo: v.ObtenerCodigo()}
@@ -105,50 +91,118 @@ func generarClavePrioridad(v vuelo.Vuelo) PrioridadClave {
 	return PrioridadClave{Prioridad: v.ObtenerPrioridad(), Codigo: v.ObtenerCodigo()}
 }
 func generarClaveConexion(v vuelo.Vuelo) string {
-	return v.ObtenerOrigen() + "-" + v.ObtenerCodigo()
-} 
+	return v.ObtenerOrigen() + "-" + v.ObtenerDestino()
+}
 
+// inserta v en la lista manteniendo orden lex ascendente de código
+func insertarOrdenadoAsc(lista Lista.Lista[vuelo.Vuelo], v vuelo.Vuelo) {
+	iter := lista.Iterador()
+	for iter.HaySiguiente() && iter.VerActual().ObtenerCodigo() < v.ObtenerCodigo() {
+		iter.Siguiente()
+	}
+	iter.Insertar(v)
+}
+
+// inserta v en la lista manteniendo orden lex descendente de código
+func insertarOrdenadoDesc(lista Lista.Lista[vuelo.Vuelo], v vuelo.Vuelo) {
+	iter := lista.Iterador()
+	// avanzamos mientras el código actual sea > que el nuevo
+	for iter.HaySiguiente() && iter.VerActual().ObtenerCodigo() > v.ObtenerCodigo() {
+		iter.Siguiente()
+	}
+	iter.Insertar(v)
+}
 
 func (sv *SistemaVuelos) agregarUnVuelo(v vuelo.Vuelo) {
 	codigo := v.ObtenerCodigo()
 
-	// Si ya existía el vuelo, lo removemos de porFecha y porConexion
+	// 1) Si ya existía, lo borramos completamente
 	if sv.porCodigo.Pertenece(codigo) {
 		viejo := sv.porCodigo.Obtener(codigo)
+		sv.borrarVuelo(viejo)
+	}
 
-		// Remover de porFecha
-		cl := FechaClave{Fecha: viejo.ObtenerFecha(), Codigo: viejo.ObtenerCodigo()}
-		sv.porFechaAsc.Borrar(cl)
-		sv.porFechaDesc.Borrar(cl)
+	// 2) Guardamos en el hash global
+	sv.porCodigo.Guardar(codigo, v)
 
-		prioCl := PrioridadClave{Prioridad: viejo.ObtenerPrioridad(), Codigo: viejo.ObtenerCodigo(),}
-		sv.porPrioridad.Borrar(prioCl)
+	// 3) Insertar en porFechaAsc
+	fecha := v.ObtenerFecha()
+	if !sv.porFechaAsc.Pertenece(fecha) {
+		// creamos la lista vacía para ese día
+		sv.porFechaAsc.Guardar(fecha, Lista.CrearListaEnlazada[vuelo.Vuelo]())
+	}
+	// ahora insertamos ordenado por código
+	listaAsc := sv.porFechaAsc.Obtener(fecha)
+	insertarOrdenadoAsc(listaAsc, v)
 
-		// Remover de porConexion
-		connKey := viejo.ObtenerOrigen() + "-" + viejo.ObtenerDestino()
-		if sv.porConexion.Pertenece(connKey) {
-			abb := sv.porConexion.Obtener(connKey)
-			abb.Borrar(cl)
-			if abb.Cantidad() == 0 {
-				sv.porConexion.Borrar(connKey)
+	// 4) Insertar en porFechaDesc (mismo tratamiento: la lista ya está
+	//    ordenada por código, pero la recorrerás en sentido inverso
+	//    si usas compararTimeDesc en el ABB externo)
+	if !sv.porFechaDesc.Pertenece(fecha) {
+		sv.porFechaDesc.Guardar(fecha, Lista.CrearListaEnlazada[vuelo.Vuelo]())
+	}
+	listaDesc := sv.porFechaDesc.Obtener(fecha)
+	insertarOrdenadoDesc(listaDesc, v)
+
+	// 5) El resto igual: prioridad y conexiones
+	prioCl := generarClavePrioridad(v)
+	sv.porPrioridad.Guardar(prioCl, v)
+
+	connKey := generarClaveConexion(v)
+	if !sv.porConexion.Pertenece(connKey) {
+		sv.porConexion.Guardar(connKey, Abb.CrearABB[FechaClave, vuelo.Vuelo](cmpFechaClaveAsc))
+	}
+	cl := generarClaveFecha(v)
+	sv.porConexion.Obtener(connKey).Guardar(cl, v)
+}
+
+func (sv *SistemaVuelos) borrarVuelo(v vuelo.Vuelo) {
+	fecha := v.ObtenerFecha()
+	codigo := v.ObtenerCodigo()
+
+	// 1) porFechaAsc
+	if sv.porFechaAsc.Pertenece(fecha) {
+		lista := sv.porFechaAsc.Obtener(fecha)
+		iter := lista.Iterador()
+		for iter.HaySiguiente() {
+			if iter.VerActual().ObtenerCodigo() == codigo {
+				iter.Borrar()
+				break
 			}
+			iter.Siguiente()
+		}
+		if lista.EstaVacia() {
+			sv.porFechaAsc.Borrar(fecha)
 		}
 	}
 
-	// Insertar nuevo vuelo en porCodigo
-	sv.porCodigo.Guardar(codigo, v)
-
-	// Insertar en porFecha
-	cl := FechaClave{Fecha: v.ObtenerFecha(), Codigo: v.ObtenerCodigo()}
-	sv.porFechaAsc.Guardar(cl, v)
-	sv.porFechaDesc.Guardar(cl, v)
-
-	prioCl := PrioridadClave{Prioridad: v.ObtenerPrioridad(), Codigo: v.ObtenerCodigo()}
-	sv.porPrioridad.Guardar(prioCl, v)
-	// Insertar en porConexion
-	connKey := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
-	if !sv.porConexion.Pertenece(connKey) {
-		sv.porConexion.Guardar(connKey, Abb.CrearABB[FechaClave, vuelo.Vuelo](comparadorFechaClave))
+	if sv.porFechaDesc.Pertenece(fecha) {
+		lista := sv.porFechaDesc.Obtener(fecha)
+		iter := lista.Iterador()
+		for iter.HaySiguiente() {
+			if iter.VerActual().ObtenerCodigo() == codigo {
+				iter.Borrar()
+				break
+			}
+			iter.Siguiente()
+		}
+		if lista.EstaVacia() {
+			sv.porFechaDesc.Borrar(fecha)
+		}
 	}
-	sv.porConexion.Obtener(connKey).Guardar(cl, v)
+
+	prioCl := generarClavePrioridad(v)
+	sv.porPrioridad.Borrar(prioCl)
+
+	connKey := generarClaveConexion(v)
+	if sv.porConexion.Pertenece(connKey) {
+		abb := sv.porConexion.Obtener(connKey)
+		cl := generarClaveFecha(v)
+		abb.Borrar(cl)
+		if abb.Cantidad() == 0 {
+			sv.porConexion.Borrar(connKey)
+		}
+	}
+
+	sv.porCodigo.Borrar(codigo)
 }

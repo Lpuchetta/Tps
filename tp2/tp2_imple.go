@@ -5,33 +5,35 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"math"
 	Dict "tdas/diccionario"
-	Heap "tdas/heap"
 	"time"
 	vuelo "tp2/vuelo"
 )
 
-// SistemaVuelos expone un TDA para:
-// - guardar vuelos a partir de archivos CSV,
-// - buscarlos por código,
-// - listarlos ordenados por fecha,
-// - y desencolar por prioridad (filtrando duplicados)
+const (
+	_MIN_CODE_ITERADORES = ""
+	_MAX_CODE_ITERADORES = "~"
+)
+
 type SistemaVuelos struct {
-	porCodigo    Dict.Diccionario[string, vuelo.Vuelo]
-	porFecha  Dict.DiccionarioOrdenado[FechaClave,vuelo.Vuelo]
-	porConexion  Dict.Diccionario[string, Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]]
+	porCodigo   Dict.Diccionario[string, vuelo.Vuelo]
+	porFechaAsc    Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]
+	porFechaDesc   Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]
+	porConexion Dict.Diccionario[string, Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]]
+	porPrioridad Dict.DiccionarioOrdenado[PrioridadClave, vuelo.Vuelo]
 }
 
 func CrearSistemaDeVuelos() *SistemaVuelos {
 	return &SistemaVuelos{
-		porCodigo:    Dict.CrearHash[string, vuelo.Vuelo](),
-		porFecha:     Dict.CrearABB[FechaClave,vuelo.Vuelo](comparadorFechaClave),
-		porConexion:  Dict.CrearHash[string, Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]](),
+		porCodigo:   Dict.CrearHash[string, vuelo.Vuelo](),
+		porFechaAsc:    Dict.CrearABB[FechaClave, vuelo.Vuelo](cmpFechaClaveAsc),
+		porFechaDesc:   Dict.CrearABB[FechaClave, vuelo.Vuelo](cmpFechaClaveDesc),
+		porConexion: Dict.CrearHash[string, Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo]](),
+		porPrioridad: Dict.CrearABB[PrioridadClave, vuelo.Vuelo](cmpPrioridadClave),
 	}
 }
 
-// Agregar_Archivo lee el CSV completo y va insertando cada línea en el TDA.
-// Si un vuelo ya existía (mismo código), se reemplaza la entrada anterior.
 func (sv *SistemaVuelos) agregar_archivo(nombreArchivo string) error {
 	archivo, err := os.Open(nombreArchivo)
 	if err != nil {
@@ -39,99 +41,36 @@ func (sv *SistemaVuelos) agregar_archivo(nombreArchivo string) error {
 	}
 
 	defer archivo.Close()
-
 	reader := csv.NewReader(archivo)
 	reader.Comma = ','
-
 	for {
 		registro, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
-		if err != nil {
-			return fmt.Errorf("error leyendo CSV: %w", err)
-		}
-
 		vueloActual, err := vuelo.ParsearLineaCSV(registro)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parseando línea: %v\n", err)
-			continue
-		}
 		sv.agregarUnVuelo(vueloActual)
 	}
 	return nil
 }
 
 func (sv *SistemaVuelos) ver_tablero(K int, modo, desde, hasta string) {
-    // Parseamos las fechas de los strings de entrada
-    fechaDesde, _ := time.Parse("2006-01-02T15:04:05", desde)
-    fechaHasta, _ := time.Parse("2006-01-02T15:04:05", hasta)
-    const maxCode = "~"
+	fechaDesde, _ := time.Parse("2006-01-02T15:04:05", desde)
+	fechaHasta, _ := time.Parse("2006-01-02T15:04:05", hasta)
+	claveDesde := FechaClave{Fecha: fechaDesde, Codigo: _MIN_CODE_ITERADORES}
+	claveHasta := FechaClave{Fecha: fechaHasta, Codigo: _MAX_CODE_ITERADORES}
 
-    // Creamos las claves de rango (desde, hasta)
-    claveDesde := FechaClave{Fecha: fechaDesde, Codigo: ""}
-    claveHasta := FechaClave{Fecha: fechaHasta, Codigo: maxCode}
-
-    if modo == "desc" {
-        // ---- AQUÍ: creamos un min‑heap real invirtiendo cmpFechaAsc ----
-        // comparadorInv := func(a, b vueloConFecha) int { return cmpFechaAsc(b, a) }
-        heap := Heap.CrearHeap(func(a, b vueloConFecha) int {
-            return cmpVueloConFechaAsc(b, a)
-        })
-
-        sv.porFecha.IterarRango(&claveDesde, &claveHasta, func(clave FechaClave, v vuelo.Vuelo) bool{
-            linea := fmt.Sprintf("%s - %s",
-                v.ObtenerFecha().Format("2006-01-02T15:04:05"),
-                v.ObtenerCodigo(),
-            )
-            vf := vueloConFecha{
-                fecha: v.ObtenerFecha(),
-                codigo: v.ObtenerCodigo(),
-                info:  linea,
-            }
-
-            if heap.Cantidad() < K {
-                heap.Encolar(vf)
-            } else {
-                // si vf es más reciente que la raíz (el más antiguo de los K),
-                // reemplazamos:
-                if cmpVueloConFechaAsc(heap.VerMax(), vf) < 0 {
-                    heap.Desencolar()
-                    heap.Encolar(vf)
-                }
-            }
-            return true
-        })
-
-        // Extraemos y volcamos en orden inverso para descendente
-        resultados := make([]string, 0, heap.Cantidad())
-        for !heap.EstaVacia() {
-            resultados = append(resultados, heap.Desencolar().info)
-        }
-        for i := len(resultados) - 1; i >= 0; i-- {
-            fmt.Println(resultados[i])
-        }
-
-    } else {
-        // Modo ascendente: iteramos y cortamos en K
-        resultados := make([]string, 0, K)
-        sv.porFecha.IterarRango(&claveDesde, &claveHasta, func(clave FechaClave, v vuelo.Vuelo) bool {
-            linea := fmt.Sprintf("%s - %s",
-                v.ObtenerFecha().Format("2006-01-02T15:04:05"),
-                v.ObtenerCodigo(),
-            )
-            resultados = append(resultados, linea)
-            return len(resultados) < K
-        })
-        for _, linea := range resultados {
-            fmt.Println(linea)
-        }
-    }
-
-    fmt.Println("OK")
+	var resultados []string
+	if modo == "asc"{
+		resultados = sv.obtenerTablero(sv.porFechaAsc, claveDesde, claveHasta, K)
+	}else{
+		resultados = sv.obtenerTablero(sv.porFechaDesc, claveHasta, claveDesde, K)
+	}
+	for _, linea := range resultados{
+		fmt.Println(linea)
+	}
+	fmt.Println("OK")
 }
-
-
 
 func (sv *SistemaVuelos) info_vuelo(codigoVuelo string) {
 	if !sv.porCodigo.Pertenece(codigoVuelo) {
@@ -144,95 +83,54 @@ func (sv *SistemaVuelos) info_vuelo(codigoVuelo string) {
 }
 
 func (sv *SistemaVuelos) borrar(desde, hasta string) {
-   // Parsear fechas con manejo de errores
-   fechaDesde, err := time.Parse("2006-01-02T15:04:05", desde)
-   if err != nil {
-       fmt.Fprintln(os.Stderr, "Error en comando borrar: formato de 'desde' inválido")
-       return
-   }
-   fechaHasta, err := time.Parse("2006-01-02T15:04:05", hasta)
-   if err != nil {
-       fmt.Fprintln(os.Stderr, "Error en comando borrar: formato de 'hasta' inválido")
-       return
-   }
-   if fechaHasta.Before(fechaDesde) {
-       fmt.Fprintln(os.Stderr, "Error en comando borrar: 'hasta' debe ser igual o posterior a 'desde'")
-       return
-   }
+	fechaDesde, _ := time.Parse("2006-01-02T15:04:05", desde)
+	fechaHasta, _ := time.Parse("2006-01-02T15:04:05", hasta)
 
-   // Claves de rango (incluyendo todo el código)
-   claveDesde := FechaClave{Fecha: fechaDesde, Codigo: ""}
-   claveHasta := FechaClave{Fecha: fechaHasta, Codigo: "~"}
+	claveDesde := FechaClave{Fecha: fechaDesde, Codigo: _MIN_CODE_ITERADORES}
+	claveHasta := FechaClave{Fecha: fechaHasta, Codigo: _MAX_CODE_ITERADORES}
 
-   // Iterar sobre porFecha (FechaClave → vuelo)
-   sv.porFecha.IterarRango(&claveDesde, &claveHasta, func(cl FechaClave, v vuelo.Vuelo) bool {
-       // a) imprimir y borrar de porCodigo
-       fmt.Println(v.MostrarInfo())
-       sv.porCodigo.Borrar(v.ObtenerCodigo())
+	procesar := func(cl FechaClave, v vuelo.Vuelo){
+		fmt.Println(v.MostrarInfo())
+		sv.porCodigo.Borrar(v.ObtenerCodigo())
+		prioridadClave := PrioridadClave{
+			Prioridad: v.ObtenerPrioridad(),
+			Codigo: v.ObtenerCodigo(),
+		}
+		sv.porPrioridad.Borrar(prioridadClave)
 
-       // b) borrar en porConexion
-       connKey := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
-       if sv.porConexion.Pertenece(connKey) {
-           abb := sv.porConexion.Obtener(connKey)
-           abb.Borrar(cl)
-           if abb.Cantidad() == 0 {
-               sv.porConexion.Borrar(connKey)
-           }
-       }
+		connKey := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
+		if sv.porConexion.Pertenece(connKey){
+			abb := sv.porConexion.Obtener(connKey)
+			abb.Borrar(cl)
+			if abb.Cantidad() == 0{
+				sv.porConexion.Borrar(connKey)
+			}
+		}
+	}
+	sv.borrarRangoEnArbol(sv.porFechaAsc, claveDesde, claveHasta, procesar)
+	sv.borrarRangoEnArbol(sv.porFechaDesc, claveHasta, claveDesde, func(cl FechaClave, v vuelo.Vuelo){
+		
+	})
 
-       // c) borrar del ABB porFecha
-       sv.porFecha.Borrar(cl)
-
-       return true // continuar borrando
-   })
-
-   fmt.Println("OK")
+	fmt.Println("OK")
 }
 func (sv *SistemaVuelos) prioridad_vuelos(k int) {
-	// 1) Recolectar vuelos en un slice
-	vuelos := make([]vuelo.Vuelo, 0, sv.porCodigo.Cantidad())
-	iter := sv.porCodigo.Iterador()
-	for iter.HaySiguiente() {
-		_, v := iter.VerActual()
-		vuelos = append(vuelos, v)
-		iter.Siguiente()
-	}
+	maxKey := PrioridadClave{Prioridad: math.MaxInt, Codigo: _MIN_CODE_ITERADORES}
+	minKey := PrioridadClave{Prioridad: math.MinInt, Codigo: _MAX_CODE_ITERADORES}
+	conteo := 0
 
-	// 2) Construir heap en O(n) usando CrearHeapArr
-	comparador := func(v1, v2 vuelo.Vuelo) int {
-		p1, p2 := v1.ObtenerPrioridad(), v2.ObtenerPrioridad()
-		if p1 != p2 {
-			if p1 > p2 {
-				return 1
-			}
-			return -1
-		}
-		if v1.ObtenerCodigo() < v2.ObtenerCodigo() {
-			return 1
-		}
-		if v1.ObtenerCodigo() > v2.ObtenerCodigo() {
-			return -1
-		}
-		return 0
-	}
-	h := Heap.CrearHeapArr(vuelos, comparador)
-
-	// 3) Extraer K vuelos en O(K log n)
-	for i := 0; i < k && !h.EstaVacia(); i++ {
-		v := h.Desencolar()
-		fmt.Printf("%d - %s\n", v.ObtenerPrioridad(), v.ObtenerCodigo())
-	}
+	sv.porPrioridad.IterarRango(&maxKey, &minKey, func(cl PrioridadClave, v vuelo.Vuelo) bool{
+		fmt.Printf("%d - %s\n", cl.Prioridad, cl.Codigo)
+		conteo++
+		return conteo < k
+	})
 	fmt.Println("OK")
 }
 
 func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fechaStr string) {
 	connKey := origen + "-" + destino
 
-	fecha, err := time.Parse("2006-01-02T15:04:05", fechaStr)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error en comando siguiente_vuelo")
-		return
-	}
+	fecha, _ := time.Parse("2006-01-02T15:04:05", fechaStr)
 
 	if !sv.porConexion.Pertenece(connKey) {
 		fmt.Printf("No hay vuelo registrado desde %s hacia %s desde %s\n", origen, destino, fechaStr)
@@ -242,14 +140,14 @@ func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fechaStr string) {
 
 	abb := sv.porConexion.Obtener(connKey)
 
-	claveDesde := FechaClave{Fecha: fecha, Codigo: ""}
+	claveDesde := FechaClave{Fecha: fecha, Codigo: _MIN_CODE_ITERADORES}
 
 	encontrado := false
 	abb.IterarRango(&claveDesde, nil, func(clave FechaClave, v vuelo.Vuelo) bool {
-		// este será el primer vuelo >= claveDesde
+
 		fmt.Println(v.MostrarInfo())
 		encontrado = true
-		return false // corto la iteración, ya encontré el vuelo siguiente
+		return false
 	})
 
 	if !encontrado {
@@ -259,4 +157,33 @@ func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fechaStr string) {
 	}
 
 	fmt.Println("OK")
+}
+
+
+func (sv *SistemaVuelos) obtenerTablero(arbol Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo], desde, hasta FechaClave, K int)[]string{
+	resultados := make([]string, 0, K)
+	arbol.IterarRango(&desde, &hasta, func(cl FechaClave, v vuelo.Vuelo) bool{
+		linea := fmt.Sprintf("%s - %s",v.ObtenerFecha().Format("2006-01-02T15:04:05"), v.ObtenerCodigo())
+		resultados = append(resultados, linea)
+		return len(resultados) < K 
+	})
+	return resultados
+}
+
+func(sv *SistemaVuelos) borrarRangoEnArbol(arbol Dict.DiccionarioOrdenado[FechaClave, vuelo.Vuelo], desde, hasta FechaClave, procesar func(cl FechaClave, v vuelo.Vuelo)){
+	var items []struct{
+		clave FechaClave
+		vuelo vuelo.Vuelo
+	}	
+	arbol.IterarRango(&desde, &hasta, func(cl FechaClave, v vuelo.Vuelo) bool{
+		items = append(items, struct{
+			clave FechaClave	
+			vuelo vuelo.Vuelo
+		}{cl, v})
+		return true
+	})
+	for _, it := range items{
+		procesar(it.clave, it.vuelo)
+		arbol.Borrar(it.clave)
+	}
 }

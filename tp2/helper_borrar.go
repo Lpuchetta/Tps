@@ -4,29 +4,15 @@ import(
 )
 // helper: desregistra un vuelo de todos los índices secundarios
 func (sv *SistemaVuelos) eliminarIndices(v vuelo.Vuelo) {
-    // 1) porCódigo
+    // porCódigo
     sv.porCodigo.Borrar(v.ObtenerCodigo())
 
-    // 2) porPrioridad (agrupado)
-    prio := v.ObtenerPrioridad()
-    if sv.porPrioridad.Pertenece(prio) {
-        lst := sv.porPrioridad.Obtener(prio)
-        it := lst.Iterador()
-        for it.HaySiguiente() {
-            if it.VerActual() == v.ObtenerCodigo() {
-                it.Borrar()
-                break
-            }
-            it.Siguiente()
-        }
-        if lst.EstaVacia() {
-            sv.porPrioridad.Borrar(prio)
-        } else {
-            sv.porPrioridad.Guardar(prio, lst)
-        }
-    }
+    // porPrioridad
+    borrarDeIndiceLista(sv.porPrioridad, v.ObtenerPrioridad(), func(codigo string) bool {
+        return codigo == v.ObtenerCodigo()
+    })
 
-    // 3) porConexion
+    // porConexion (no es lista, se maneja directo)
     connKey := v.ObtenerOrigen() + "-" + v.ObtenerDestino()
     if sv.porConexion.Pertenece(connKey) {
         abbConn := sv.porConexion.Obtener(connKey)
@@ -36,3 +22,4 @@ func (sv *SistemaVuelos) eliminarIndices(v vuelo.Vuelo) {
         }
     }
 }
+

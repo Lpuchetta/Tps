@@ -61,9 +61,9 @@ func (sv *SistemaVuelos) ver_tablero(K int, modo, desde, hasta string) {
 
 	var resultados []string
 	if modo == "asc" {
-		resultados = sv.obtenerTablero(sv.porFechaAsc, fechaDesde, fechaHasta, K, true)
+		resultados = sv.obtenerTablero(sv.porFechaAsc, fechaDesde, fechaHasta, K)
 	} else {
-		resultados = sv.obtenerTablero(sv.porFechaDesc, fechaHasta, fechaDesde, K, false)
+		resultados = sv.obtenerTablero(sv.porFechaDesc, fechaHasta, fechaDesde, K)
 	}
 
 	for _, linea := range resultados {
@@ -89,54 +89,54 @@ func (sv *SistemaVuelos) borrar(desde, hasta string) {
     var fechasAEliminar []time.Time
     sv.porFechaAsc.IterarRango(&fechaDesde, &fechaHasta, func(fecha time.Time, lista Lista.Lista[vuelo.Vuelo]) bool {
         for it := lista.Iterador(); it.HaySiguiente(); it.Siguiente() {
-            v := it.VerActual()
-            fmt.Println(v.MostrarInfo())
-            sv.eliminarIndices(v)
+            vuelo := it.VerActual()
+            fmt.Println(vuelo.MostrarInfo())
+            sv.eliminarIndices(vuelo)
         }
         fechasAEliminar = append(fechasAEliminar, fecha)
         return true
     })
 
-    for _, f := range fechasAEliminar {
-        sv.porFechaAsc.Borrar(f)
-        sv.porFechaDesc.Borrar(f)
+    for _, fechas := range fechasAEliminar {
+        sv.porFechaAsc.Borrar(fechas)
+        sv.porFechaDesc.Borrar(fechas)
     }
 
     fmt.Println("OK")
 }
 
 func (sv *SistemaVuelos) prioridad_vuelos(k int) {
-    minPrio := math.MinInt
-    count := 0
-	sv.porPrioridad.IterarRango(nil, &minPrio, func(prio int, lst Lista.Lista[string]) bool {
-        iter := lst.Iterador()
-        for iter.HaySiguiente() && count < k {
-            codigo := iter.VerActual()
-            fmt.Printf("%d - %s\n", prio, codigo)
-            count++
-            iter.Siguiente()
+    prioridadMinima := math.MinInt
+    conteo := 0
+	sv.porPrioridad.IterarRango(nil, &prioridadMinima, func(prioridad int, lista Lista.Lista[string]) bool {
+        iterador := lista.Iterador()
+        for iterador.HaySiguiente() && conteo < k {
+            codigo := iterador.VerActual()
+            fmt.Printf("%d - %s\n", prioridad, codigo)
+            conteo++
+            iterador.Siguiente()
         }
-        return count < k
+        return conteo < k
     })
 	fmt.Println("OK")
 }
 
 
 func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fechaStr string) {
-    connKey := origen + "-" + destino
+    claveConexion := origen + "-" + destino
     fecha, _ := time.Parse("2006-01-02T15:04:05", fechaStr)
 
-    if !sv.porConexion.Pertenece(connKey) {
+    if !sv.porConexion.Pertenece(claveConexion) {
         fmt.Printf("No hay vuelo registrado desde %s hacia %s desde %s\n", origen, destino, fechaStr)
         fmt.Println("OK")
         return
     }
-    abb := sv.porConexion.Obtener(connKey)
+    abb := sv.porConexion.Obtener(claveConexion)
     claveDesde := FechaClave{Fecha: fecha, Codigo: _MAX_CODE_ITERADORES}
 
     encontrado := false
-    abb.IterarRango(&claveDesde, nil, func(clave FechaClave, v vuelo.Vuelo) bool {
-        fmt.Println(v.MostrarInfo())
+    abb.IterarRango(&claveDesde, nil, func(clave FechaClave, vuelo vuelo.Vuelo) bool {
+        fmt.Println(vuelo.MostrarInfo())
         encontrado = true
         return false
     })
@@ -149,19 +149,19 @@ func (sv *SistemaVuelos) siguiente_vuelo(origen, destino, fechaStr string) {
 }
 
 
-func (sv *SistemaVuelos) obtenerTablero(arbol Dict.DiccionarioOrdenado[time.Time, Lista.Lista[vuelo.Vuelo]], desde, hasta time.Time, K int, esAsc bool) []string {
+func (sv *SistemaVuelos) obtenerTablero(arbol Dict.DiccionarioOrdenado[time.Time, Lista.Lista[vuelo.Vuelo]], desde, hasta time.Time, K int) []string {
 	resultados := make([]string, 0, K)
 
 	arbol.IterarRango(&desde, &hasta, func(fecha time.Time, lista Lista.Lista[vuelo.Vuelo]) bool {
-		iter := lista.Iterador()
-		for iter.HaySiguiente() && len(resultados) < K {
-			v := iter.VerActual()
+		iterador := lista.Iterador()
+		for iterador.HaySiguiente() && len(resultados) < K {
+			v := iterador.VerActual()
 			resultados = append(resultados, fmt.Sprintf(
 				"%s - %s",
 				v.ObtenerFecha().Format("2006-01-02T15:04:05"),
 				v.ObtenerCodigo(),
 			))
-			iter.Siguiente()
+			iterador.Siguiente()
 		}
 		return len(resultados) < K
 	})
